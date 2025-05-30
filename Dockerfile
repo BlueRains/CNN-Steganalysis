@@ -1,14 +1,16 @@
 # Use the official Python image from the Docker Hub
 FROM python:3.9-slim
 
+# Use pipenv for installing the packages
+RUN pip install pipenv
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy the requirements file into the container
-COPY requirements.txt .
+# Copy Pipfile and Pipfile.lock
+COPY Pipfile Pipfile.lock ./
 
 # Install any dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pipenv install --system --deploy
 
 # Copy the rest of the application code into the container
 COPY src/ /app/

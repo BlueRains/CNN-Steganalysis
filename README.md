@@ -22,7 +22,7 @@ This project was developed by Radu-Cristian Basarabă as part of a master's thes
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.11 or 3.12
 - Docker
 - Azure CLI (for cloud deployment)
 
@@ -42,6 +42,12 @@ Create a virtual environment and install the required packages:
 python -m venv venv
 source venv/bin/activate  
 pip install -r [requirements.txt]
+```
+
+Alternatively, use pipenv:
+
+```bash
+pipenv install
 ```
 
 ## Training the Model
@@ -64,13 +70,13 @@ python [metricsCNN.py]
 
 ### Docker Deployment
 
-#### Build the Docker image:
+#### Build the Docker image
 
 ```bash
 docker build -t stegascanner .
 ```
 
-#### Run the Docker container:
+#### Run the Docker container
 
 ```bash
 docker run -d -p 5000:5000 stegascanner

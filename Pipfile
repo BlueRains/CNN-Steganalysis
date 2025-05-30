@@ -1,0 +1,20 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+keras-tuner = "*"
+restrictedpython = "*"
+scikit-image = "*"
+scikit-learn = "*"
+attrs = "*"
+kagglehub = "*"
+tensorflow = {extras = ["and-cuda"], version = "*"}
+
+[dev-packages]
+ruff = "*"
+pylint = "*"
+
+[requires]
+python_version = "3.12"
