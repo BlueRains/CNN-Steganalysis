@@ -5,3 +5,4 @@ best_model.keras
 __pycache__/
 .vscode/
 .ruff_cache/
+*.code-workspace

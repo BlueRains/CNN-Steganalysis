@@ -1,0 +1,59 @@
+[tool.ruff]
+fix = true
+[tool.ruff.lint]
+# E4, E7, E9 and F are the defaults
+select = [
+    "F",     # Pyflake format
+    "FAST",  # FastAPI
+    "I",     # Sorting imports
+    "N",     # Make sure the naming matches PEP8 convention
+    "E",     # Python codestyle errors
+    "W",     # Python codestyle warnings
+    "D",     # Docstrings
+    "FA",    # Future annotations
+    "ISC",   # String concatination
+    "ICN",   # Import conventions
+    "INP",   # pep420 adherence
+    "T20",   # No printing statements
+    "PYI",   # Python stub files
+    "Q",     # Make sure the quote style is consistent
+    "RET",   # Returns
+    "SLF",   # Respect private functions, variables, etc
+    "SIM",   # Simplify code where possible
+    "TC001", # todo should be TODO, not FIXME/BUG
+    "ARG",   # Unused arguments
+    "C90",   # Don't allow functions with complexity rating above 10
+    "PERF",  # Performance check
+    "PL",    # Pylint
+    "FURB",  # Don't do unneccesary operations (refurb)
+    "RUF",   # Various Ruff rules
+    "TRY",   # Neat handling of try-except
+    "ERA",   # Don't allow commented out code
+
+]
+ignore = [
+# Not recommended along with the formatter
+    "W191",
+    "E114",
+    "E117",
+    "D206",
+    "D300",
+    "Q000",
+    "Q001",
+    "Q002",
+    "Q003",
+    "COM812",
+    "COM819",
+    # Other
+    "ISC002",
+    "D203",
+    "D212",
+    "TRY003", # Exceptions must not have large text variables
+]
+extend-safe-fixes = ["D400"]
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+ignore-decorators = ["wraps"]
+[tool.ruff.lint.per-file-ignores]
+# Ignore `D` rules in the test directory
+"test/**.py" = ["D"]
