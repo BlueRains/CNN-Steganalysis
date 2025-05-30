@@ -37,8 +37,9 @@ from sklearn.metrics import (
 )
 from sklearn.utils.class_weight import compute_class_weight
 
-from Dataset import load_dataset
+from Dataset import DatasetFiles, load_dataset
 
+logger = logging.getLogger(__name__)
 THRESHOLD = 0.5
 
 
@@ -91,7 +92,7 @@ def high_pass_layer() -> Conv2D:
         [type]: [description]
     """
     kernel_init = tf.constant_initializer(
-        [[[[-1]], [[2]], [[-1]]], [[[2]], [[-4]], [[2]]], [[[-1]], [[2]], [[-1]]]]
+        [[[[-1]], [[2]], [[-1]]], [[[2]], [[-4]], [[2]]], [[[-1]], [[2]], [[-1]]]] * 3
     )
     return Conv2D(
         filters=1,
@@ -172,8 +173,8 @@ def prepare_dataset(
     """Prepare a datset for training.
 
     Args:
-        image_paths (_type_): _description_
-        labels (_type_): _description_
+        image_paths (list[str]): _description_
+        labels (list[int]): _description_
         batch_size (int, optional): _description_. Defaults to 32.
         training (bool, optional): _description_. Defaults to False.
     """
@@ -195,19 +196,16 @@ def prepare_dataset(
     return dataset
 
 
-def main():
+def train(data: DatasetFiles):
     """Train and test CNN."""
-    train_folder = "archive/train/train"
-    test_folder = "archive/test/test"
-    validation_folder = "archive/val/val"
-
-    train_image_paths, train_labels = load_dataset(train_folder)
-    validation_image_paths, validation_labels = load_dataset(validation_folder)
-    test_image_paths, test_labels = load_dataset(test_folder)
+    train_image_paths, train_labels = load_dataset(data.train)
+    validation_image_paths, validation_labels = load_dataset(data.val)
+    test_image_paths, test_labels = load_dataset(data.test)
 
     train_dataset = prepare_dataset(train_image_paths, train_labels, training=True)
     validation_dataset = prepare_dataset(validation_image_paths, validation_labels)
     test_dataset = prepare_dataset(test_image_paths, test_labels)
+    logger.info("Prepared dataset")
     tuner = kt.Hyperband(
         build_model,
         objective="val_accuracy",
@@ -246,6 +244,7 @@ def main():
 
     best_hps = tuner.get_best_hyperparameters(num_trials=1)[0]
     model = tuner.hypermodel.build(best_hps)
+    logger.info("Fitting model")
     model.fit(
         train_dataset,
         epochs=25,
@@ -254,45 +253,47 @@ def main():
         callbacks=[reduce_lr, early_stopping, model_checkpoint],
     )
 
+    logger.info("Saving model")
     model.save("model/modelCNN.keras")
 
+    logger.info("Evaluating model")
     y_true = np.array(
         [label for _, label in test_dataset.unbatch().as_numpy_iterator()]
     ).astype(float)
     y_pred = model.predict(test_dataset)
     y_pred_classes = (y_pred > THRESHOLD).astype(int).flatten()
 
-    logging.info("CNN Classification Report:")
-    logging.info(
+    logger.info("CNN Classification Report:")
+    logger.info(
         classification_report(y_true, y_pred_classes, target_names=["Clean", "Stego"])
     )
 
-    logging.info("CNN Confusion Matrix:")
+    logger.info("CNN Confusion Matrix:")
     conf_matrix = confusion_matrix(y_true, y_pred_classes)
-    logging.info(conf_matrix)
+    logger.info(conf_matrix)
 
     accuracy = np.mean(y_pred_classes == y_true)
-    logging.info("CNN Accuracy: %d", accuracy)
+    logger.info("CNN Accuracy: %d", accuracy)
 
     precision = precision_score(y_true, y_pred_classes)
-    logging.info("CNN Precision: %d", precision)
+    logger.info("CNN Precision: %d", precision)
 
     recall = recall_score(y_true, y_pred_classes)
-    logging.info("CNN Recall: %d", recall)
+    logger.info("CNN Recall: %d", recall)
 
     f1 = f1_score(y_true, y_pred_classes)
-    logging.info("CNN F1 Score: %d", f1)
+    logger.info("CNN F1 Score: %d", f1)
 
     tn, fp, fn, tp = conf_matrix.ravel()
     specificity = tn / (tn + fp)
-    logging.info("CNN Specificity: %d", specificity)
+    logger.info("CNN Specificity: %d", specificity)
 
     fpr = fp / (fp + tn)
-    logging.info("CNN False Positive Rate (FPR): %d", fpr)
+    logger.info("CNN False Positive Rate (FPR): %d", fpr)
 
     roc_auc = roc_auc_score(y_true, y_pred)
-    logging.info("CNN AUC-ROC: %d", roc_auc)
+    logger.info("CNN AUC-ROC: %d", roc_auc)
 
 
 if __name__ == "__main__":
-    main()
+    train()

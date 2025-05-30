@@ -1,11 +1,15 @@
 """Check the metrics of a CNN."""
 
-import logging
+from __future__ import annotations
+
+import os
 
 import numpy as np
 import tensorflow as tf
+from attrs import define
+from keras.layers import Rescaling
 from keras.models import Model, load_model
-from keras.preprocessing.image import ImageDataGenerator
+from keras.preprocessing import image_dataset_from_directory
 from sklearn.metrics import (
     classification_report,
     confusion_matrix,
@@ -16,50 +20,106 @@ from sklearn.metrics import (
 )
 
 
+@define(frozen=True)
+class Evaluation:
+    """An evaluation of model performance."""
+
+    name: str
+    classification: str | dict
+    confusion_matrix: tuple[tuple[int, int], tuple[int, int]]
+    recall: int
+    f1: int
+    precision: int
+    accuracy: int
+    roc_auc: int
+
+    def __str__(self):
+        """Return a string represnetation of the Evaluation."""
+        return (
+            f"{self.name} Evaluation:"
+            f"Classification Report:\n{self.classification}"
+            "Confusion Matrix:\n"
+            f"{self.confusion_matrix}"
+            f"Recall: {self.recall}"
+            f"F1 Score: {self.f1}"
+            f"Precision: {self.precision}"
+            f"Accuracy: {self.accuracy}"
+            f"ROC AUC Score: {self.roc_auc}"
+        )
+
+    def to_latex_table(self) -> str:
+        """Return the smaller items in latex table format.
+
+        These items are:
+        - Recall
+        - Precision
+        - Accuracy
+        - F1 Score
+        - ROC AUC
+        """
+        items = [self.recall, self.precision, self.accuracy, self.f1, self.roc_auc]
+        return " & ".join(map(str, items))
+
+
 class ModelTester:
     """Tests the models."""
 
     def __init__(
-        self, model_path: str, test_folder: str, batch_size=32, target_size=(512, 512)
+        self, model: Model, test_folder: str, batch_size=32, target_size=(512, 512)
     ):
         """Initialise a ModelTester.
 
         Args:
-            model_path (str): The model to test.
+            model (Model): The model to test.
             test_folder (str): The location of the test folder
             batch_size (int, optional): How many images to test at once. Defaults to 32.
             target_size (tuple, optional): How big the processed images should be.
             Defaults to (512, 512).
         """
-        self.model_path = model_path
         self.test_folder = test_folder
         self.batch_size = batch_size
         self.target_size = target_size
-        self.model = self.load_model()
+        self.model = model
         self.test_generator = self.create_test_generator()
 
-    def load_model(self) -> Model:
-        """Load a model.
+    @classmethod
+    def from_path(
+        cls, model_path: str, test_folder: str, batch_size=32, target_size=(512, 512)
+    ):
+        """Create a ModelTester from a given model path.
 
-        Returns:
-            Model: The loaded model.
+        Args:
+            model_path (str): The path to the saved model
+            test_folder (str): The folder of test files
+            batch_size (int, optional): How many images to test at once. Defaults to 32.
+            target_size (tuple, optional): The image size. Defaults to (512, 512).
         """
-        return load_model(self.model_path)  # type: ignore
+        return ModelTester(
+            load_model(
+                model_path,
+            ),
+            test_folder,
+            batch_size,
+            target_size,
+        )
 
     def create_test_generator(self) -> tf.data.Dataset:
         """Create a Dataset from the test dataset.
 
+        Values are rescaled to [0,1]
+
         Returns:
-            _type_: _description_
+            Dataset: the resulting dataset
         """
-        test_datagen = ImageDataGenerator(rescale=1.0 / 255.0)
-        return test_datagen.flow_from_directory(
+        unscaled: tf.data.Dataset = image_dataset_from_directory(
             self.test_folder,
-            target_size=self.target_size,
+            label_mode="categorical",
+            image_size=self.target_size,
             batch_size=self.batch_size,
-            class_mode="categorical",
             shuffle=False,
         )
+        normalization_layer = Rescaling(1.0 / 255)
+        return unscaled.map(lambda x, y: (normalization_layer(x), y))
 
     def evaluate_model(self):
         """Evaluate the resulting model."""
@@ -83,13 +143,16 @@ class ModelTester:
         y_true_one_hot[np.arange(y_true.size), y_true] = 1
         roc_auc = roc_auc_score(y_true_one_hot, y_pred, multi_class="ovr")
 
-        logging.info("Classification Report:\n%s", report)
-        logging.info("Confusion Matrix:\n%s", cm)
-        logging.info(f"Recall: {recall}")
-        logging.info(f"F1 Score: {f1}")
-        logging.info(f"Precision: {precision}")
-        logging.info(f"Accuracy: {accuracy}")
-        logging.info(f"ROC AUC Score: {roc_auc}")
+        return Evaluation(
+            self.model_path.split(os.path.seperator)[-1],
+            report,
+            cm,
+            recall,
+            f1,
+            precision,
+            accuracy,
+            roc_auc,
+        )
 
 
 # Usage
@@ -97,4 +160,5 @@ if __name__ == "__main__":
     model_path = "model/best_modelCNN.keras"
     test_folder = "archive/test/test"
     tester = ModelTester(model_path, test_folder)
-    tester.evaluate_model()
+    evaluation = tester.evaluate_model()
+    print(evaluation)

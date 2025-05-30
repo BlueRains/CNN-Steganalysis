@@ -1,21 +1,69 @@
 """Load the dataset for training a CNN."""
 
-import logging
 import os
 
 import kagglehub
 import tensorflow as tf
+from attrs import define, field
 from tensorflow.python.data.ops.dataset_ops import DatasetV2
 
 from ImagePreprocessor import preprocess_image
 
 
-def main():
-    """Import dataset."""
-    # Download latest version
-    path = kagglehub.dataset_download("marcozuppelli/stegoimagesdataset")
+@define
+class DatasetFiles:
+    """Where a dataset is stored."""
 
-    logging.info("Path to dataset files: %s", path)
+    url: str
+    _train: str = field()
+    _test: str = field()
+    _val: str = field()
+    path: str = field(init=False, default=None)
+
+    def download_dataset(self):
+        """Download the dataset from `url`. Download location is stored in `path`."""
+        self.path = kagglehub.dataset_download(self.url)
+
+    @property
+    def train(self):
+        """Get or set the training folder.
+
+        If get, combined with `path`.
+        If path is not yet set, download the dataset.
+        """
+        if self.path is None:
+            self.download_dataset()
+        return os.path.join(self.path, self._train)
+
+    @property
+    def test(self):
+        """Get or set the test folder.
+
+        If get, combined with `path`.
+        If path is not yet set, download the dataset.
+        """
+        if self.path is None:
+            self.download_dataset()
+        return os.path.join(self.path, self._test)
+
+    @property
+    def val(self):
+        """Get or set the validation folder.
+
+        If get, combined with `path`.
+        If path is not yet set, download the dataset.
+        """
+        if self.path is None:
+            self.download_dataset()
+        return os.path.join(self.path, self._val)
+
+
+stego_images_dataset = DatasetFiles(
+    "marcozuppelli/stegoimagesdataset",
+    os.path.join(*["train"] * 2),
+    os.path.join(*["test"] * 2),
+    os.path.join(*["val"] * 2),
+)
 
 
 def load_dataset(folder: str) -> tuple[list[str], list[int]]:
@@ -61,7 +109,7 @@ def create_tf_dataset(
         DatasetV2: The tensorflow dataset.
     """
 
-    def load_and_preprocess_image(path, label):
+    def load_and_preprocess_image(path: str, label: int):
         image = tf.numpy_function(preprocess_image, [path], tf.float32)
         image.set_shape((512, 512, 3))
         return image, label
