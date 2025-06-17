@@ -47,7 +47,7 @@ pip install -r [requirements.txt]
 Alternatively, use pipenv:
 
 ```bash
-pipenv install
+pipenv sync [--dev]
 ```
 
 ## Training the Model

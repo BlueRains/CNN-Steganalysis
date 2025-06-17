@@ -114,53 +114,22 @@ def build_model(hp) -> Model:
     """
     inputs = Input(shape=(512, 512, 3))
     x = high_pass_layer()(inputs)
-
+    logger.info("Added high-pass layer")
     for i in range(hp.Int("conv_blocks", 1, 3, default=2)):
         filters = hp.Choice(f"filters_{i}", [32, 64, 128])
         x = Conv2D(filters, (3, 3), activation="relu", padding="same")(x)
         x = BatchNormalization()(x)
         x = MaxPooling2D()(x)
         x = Dropout(hp.Float(f"dropout_{i}", 0.1, 0.5, step=0.1))(x)
-
+    logger.info("Added convolutional blocks")
     x = GlobalAveragePooling2D()(x)
     x = Dense(hp.Int("dense_units", 64, 256, step=64), activation="relu")(x)
     outputs = Dense(1, activation="sigmoid")(x)
 
     model = Model(inputs, outputs)
+    logger.info("Compiling model")
     model.compile(
         optimizer=Adam(hp.Choice("learning_rate", [1e-3, 1e-4, 5e-4])),
-        loss="binary_crossentropy",
-        metrics=["accuracy"],
-    )
-    return model
-
-
-def create_resnet50_model(input_shape) -> Model:
-    """Create a ResNet50-based CNN.
-
-    Args:
-        input_shape (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    """
-    base_model = ResNet50(
-        weights="imagenet", include_top=False, input_shape=input_shape
-    )
-
-    # Freeze first layers
-    for layer in base_model.layers[:-30]:  # Unfreeze last few layers
-        layer.trainable = False
-
-    x = base_model.output
-    x = GlobalAveragePooling2D()(x)
-    x = Dense(256, activation="relu")(x)
-    x = Dropout(0.3)(x)
-    outputs = Dense(1, activation="sigmoid")(x)
-
-    model = Model(inputs=base_model.input, outputs=outputs)
-    model.compile(
-        optimizer=Adam(learning_rate=1e-4),
         loss="binary_crossentropy",
         metrics=["accuracy"],
     )
@@ -178,6 +147,7 @@ def prepare_dataset(
         batch_size (int, optional): _description_. Defaults to 32.
         training (bool, optional): _description_. Defaults to False.
     """
+    logger.info("Preparing dataset with %d images", len(image_paths))
 
     def load_image(path, label):
         img = tf.io.read_file(path)
@@ -193,6 +163,7 @@ def prepare_dataset(
         dataset = dataset.shuffle(1000).batch(batch_size).prefetch(tf.data.AUTOTUNE)
     else:
         dataset = dataset.batch(batch_size)
+    logger.info("Dataset prepared with batch size %d", batch_size)
     return dataset
 
 
@@ -205,7 +176,7 @@ def train(data: DatasetFiles):
     train_dataset = prepare_dataset(train_image_paths, train_labels, training=True)
     validation_dataset = prepare_dataset(validation_image_paths, validation_labels)
     test_dataset = prepare_dataset(test_image_paths, test_labels)
-    logger.info("Prepared dataset")
+    logger.info("Prepared datasets")
     tuner = kt.Hyperband(
         build_model,
         objective="val_accuracy",
@@ -214,14 +185,15 @@ def train(data: DatasetFiles):
         directory="my_dir",
         project_name="cnn_steganalysis",
     )
-
+    logger.info("Created Hyperband tuner")
+    logger.info("Starting hyperparameter search")
     reduce_lr = ReduceLROnPlateau(
         monitor="val_loss", factor=0.2, patience=5, min_lr=1e-6
     )
     early_stopping = EarlyStopping(
         monitor="val_loss", patience=10, restore_best_weights=True
     )
-    best_model_path = "best_modelCNN.keras"
+    best_model_path = "results/best_modelCNN.keras"
     model_checkpoint = ModelCheckpoint(
         best_model_path,
         monitor="val_accuracy",
@@ -234,15 +206,18 @@ def train(data: DatasetFiles):
         class_weight="balanced", classes=np.unique(train_labels), y=train_labels
     )
     class_weights = {i: class_weights[i] for i in range(len(class_weights))}
-
     tuner.search(
         train_dataset,
         epochs=20,
         validation_data=validation_dataset,
         callbacks=[reduce_lr, early_stopping],
     )
-
+    logger.info("Hyperparameter search completed")
+    logger.info(
+        "Best hyperparameters found: %s", tuner.get_best_hyperparameters()[0].values
+    )
     best_hps = tuner.get_best_hyperparameters(num_trials=1)[0]
+    logger.info("Building model with best hyperparameters")
     model = tuner.hypermodel.build(best_hps)
     logger.info("Fitting model")
     model.fit(
@@ -254,7 +229,7 @@ def train(data: DatasetFiles):
     )
 
     logger.info("Saving model")
-    model.save("model/modelCNN.keras")
+    model.save("results/modelCNN.keras")
 
     logger.info("Evaluating model")
     y_true = np.array(

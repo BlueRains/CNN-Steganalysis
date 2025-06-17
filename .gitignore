@@ -6,3 +6,7 @@ __pycache__/
 .vscode/
 .ruff_cache/
 *.code-workspace
+.env
+my_dir/
+*.log
+*.bash

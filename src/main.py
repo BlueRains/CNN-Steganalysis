@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def __main():
-    logging.basicConfig(filename="main.log", level="INFO")
+    logging.basicConfig(filename="logs/main.log", level="INFO")
     logger.debug("Training devices available: %d", tf.config.list_physical_devices())
     stego_images_dataset.download_dataset()
     logger.info("Downloaded dataset")
